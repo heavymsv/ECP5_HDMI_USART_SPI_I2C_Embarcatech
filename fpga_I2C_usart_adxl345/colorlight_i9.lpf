@@ -1,0 +1,17 @@
+# Clock 25 MHz
+LOCATE    COMP "clk" SITE "P3";
+IOBUF     PORT "clk" IO_TYPE=LVCMOS33;
+FREQUENCY PORT "clk" 25 MHz;
+
+# Reset (puxe para cima se não tiver botão)
+LOCATE COMP "rst_n" SITE "B1"; IOBUF PORT "rst_n" IO_TYPE=LVCMOS33 PULLMODE=UP;
+
+# I2C
+LOCATE   COMP "i2c_scl" SITE "E2";
+IO_TYPE  PORT "i2c_scl" IO_TYPE=LVCMOS33;      # SCL push-pull está ok para ADXL345
+LOCATE   COMP "i2c_sda" SITE "D1";
+IOBUF    PORT "i2c_sda" PULLMODE=UP IO_TYPE=LVCMOS33;    # SDA é inout (open drain)
+
+# UART TX
+LOCATE   COMP "uart_tx" SITE "D2";
+IO_TYPE  PORT "uart_tx" IO_TYPE=LVCMOS33;
