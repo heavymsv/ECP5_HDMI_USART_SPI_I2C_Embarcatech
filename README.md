@@ -1,76 +1,184 @@
-# Integração de Interfaces Sensoriais e Geração de Vídeo em FPGA (Colorlight i9)
+# ECP5_HDMI_USART_SPI_I2C_Embarcatech
 
-[cite_start]Este repositório contém o código-fonte (SystemVerilog/Verilog) para o projeto de um sistema embarcado reconfigurável desenvolvido para a placa FPGA **Colorlight i9 (Lattice ECP5)**[cite: 1, 6, 12].
+![Yosys](https://img.shields.io/badge/Synthesis-Yosys-blue?logo=yosys) ![NextPNR](https://img.shields.io/badge/Place%20%26%20Route-NextPNR-green) ![License](https://img.shields.io/badge/License-MIT-yellow) ![FPGA](https://img.shields.io/badge/FPGA-Lattice%20ECP5-orange)
 
-[cite_start]O objetivo do sistema é ler dados de sensores, processá-los e exibi-los em tempo real através de uma saída de vídeo HDMI, além de fornecer comunicação serial para depuração[cite: 5, 11].
+### Integração de Interfaces Sensoriais e Geração de Vídeo em FPGA na Plataforma Colorlight i9 (Lattice ECP5)
 
-[cite_start]Este projeto foi desenvolvido como parte do programa **EmbarcaTech TIC 37**, uma parceria com o **Instituto Federal do Maranhão (IFMA)**[cite: 4, 105].
-
-## Hardware e Plataforma
-
-* [cite_start]**FPGA:** Placa Colorlight i9 [cite: 49]
-* [cite_start]**Chip:** Lattice ECP5 (LFE5U-45F) [cite: 21, 49]
-* **Sensores (descritos no projeto):**
-    * [cite_start]Sensor de Pressão e Temperatura BMP280 (implementação final) [cite: 60]
-    * [cite_start]Acelerômetro ADXL345 (design original) [cite: 21, 56]
-* [cite_start]**Saída:** HDMI (conector de expansão) [cite: 50]
+Este projeto foi desenvolvido no âmbito do programa **Residência Tecnológica EmbarcaTech (TIC 37 - IFMA)** e tem como objetivo a criação de um **sistema embarcado reconfigurável** capaz de adquirir dados sensoriais, processá-los em hardware e exibi-los em tempo real via **HDMI**, utilizando a FPGA **Colorlight i9** (baseada no **Lattice ECP5 LFE5U-45F**).
 
 ---
 
-## Módulos e Funcionalidades Implementadas
+## 🧠 Visão Geral do Projeto
 
-[cite_start]O design é escrito em SystemVerilog [cite: 7, 13, 45] e inclui os seguintes módulos principais:
+O sistema integra três subsistemas principais:
 
-* ### Subsistema de Vídeo HDMI (720p@60Hz)
-    * [cite_start]**Gerador de Temporização VESA:** Cria os sinais `HSYNC`, `VSYNC` e `Data Enable` para a resolução de 1280x720@60Hz[cite: 28, 42, 54].
-    * [cite_start]**Codificador TMDS:** Implementa a codificação 8b/10b necessária para a sinalização HDMI, garantindo o balanço de DC[cite: 28, 43, 54].
-    * [cite_start]**Serializador de Alta Velocidade:** Utiliza as primitivas `ODDR` (Output Double Data Rate) do ECP5 para serializar os dados e atingir o *bit rate* de 742.5 Mbps[cite: 54, 79, 88].
+1. **Aquisição Sensorial (I²C/SPI)**
 
-* ### Geração de Clock (PLL)
-    * [cite_start]Utiliza a primitiva `EHXPLLL` do Lattice ECP5 para gerar os clocks de alta velocidade necessários para o vídeo[cite: 29, 75].
-    * [cite_start]A partir de um clock de entrada de 25 MHz, o PLL gera[cite: 76, 78]:
-        * [cite_start]**`clk_pix` (Pixel Clock):** 74.25 MHz [cite: 78]
-        * [cite_start]**`clk_ser` (Serialization Clock):** 371.25 MHz (5x o *Pixel Clock*) [cite: 78]
+   * Leitura de sensores digitais via barramentos seriais.
+   * Versão inicial: ADXL345 (acelerômetro, via I²C).
+   * Versão final (protótipo físico): BMP280 (pressão e temperatura, via SPI).
 
-* ### Módulos de Comunicação Serial
-    * [cite_start]**SPI Mestre:** Controlador para interface com o sensor BMP280 (implementação final)[cite: 59].
-    * [cite_start]**I2C Mestre:** Controlador com emulação de lógica *open-drain* (via `tri-state`) para interface com o sensor ADXL345 (design original)[cite: 26, 54].
-    * [cite_start]**Transmissor UART:** Implementado com padrão de *oversampling* 16x para comunicação assíncrona e depuração[cite: 27, 54].
+2. **Transmissão Serial (UART)**
 
-* ### Módulos de Lógica e Processamento
-    * [cite_start]**Lógica de Compensação (BMP280):** Módulo de hardware complexo que lê os 24 coeficientes de calibração do BMP280 e converte os dados brutos de pressão e temperatura em valores finais (hPa e °C)[cite: 61, 131].
-    * [cite_start]**Gerenciamento de Domínio de Clock (CDC):** Implementa `double-buffering` para transferir dados de forma segura entre os domínios de clock lentos (sensores) e o domínio de clock rápido do pixel (74.25 MHz), evitando *tearing* visual[cite: 9, 15, 54, 98].
+   * Comunicação assíncrona com padrão **16x oversampling**.
+   * Utilizada para depuração e envio de dados via **USART TX**.
+
+3. **Renderização de Vídeo HDMI (720p@60Hz)**
+
+   * Geração de sinais de vídeo com sincronização **VESA 1280×720@60Hz**.
+   * Codificação **TMDS (8b/10b)** para transmissão diferencial.
+   * Utiliza **PLL (EHXPLLL)** para gerar clocks de até **371,25 MHz**.
+   * Serialização dos sinais com registradores **ODDR**.
 
 ---
 
-## Nota Importante sobre o Projeto (I2C/ADXL345 vs. SPI/BMP280)
+## ⚙️ Arquitetura e Metodologia
 
-[cite_start]Este repositório e o relatório técnico associado descrevem duas arquiteturas de sensores[cite: 56, 62]:
+O projeto foi desenvolvido integralmente em **SystemVerilog**, com design modular e FSMs para controle dos protocolos seriais e de vídeo.
 
-1.  [cite_start]**Design Original:** Utilizava um mestre **I2C** para se comunicar com um acelerômetro **ADXL345**[cite: 56]. Os módulos para esta implementação estão presentes no projeto.
-2.  [cite_start]**Implementação Final (Protótipo):** Devido a desafios técnicos de última hora durante os testes [cite: 57][cite_start], o hardware do protótipo final foi adaptado[cite: 58]. [cite_start]O módulo I2C foi substituído por um mestre **SPI** [cite: 59] [cite_start]e o sensor ADXL345 foi substituído por um sensor de pressão e temperatura **BMP280**[cite: 60].
+Além disso, o subsistema de renderização HDMI baseia-se no repositório **[Project F - FPGA Graphics](https://github.com/projf/projf-explore/tree/main/graphics/fpga-graphics)**, adaptado para integrar o pipeline de vídeo e o controle TMDS no contexto da FPGA Colorlight i9.
 
-[cite_start]O código-fonte no repositório reflete a **arquitetura final demonstrada (SPI/BMP280)**, incluindo a lógica de compensação de hardware necessária para o BMP280[cite: 61, 62, 131].
+| Módulo                           | Função Principal        | Destaques Técnicos                                                   |
+| -------------------------------- | ----------------------- | -------------------------------------------------------------------- |
+| **I2C Master**                   | Comunicação com ADXL345 | FSM de 10 estados, emulação de open-drain (tri-state).               |
+| **SPI Master**                   | Comunicação com BMP280  | Leitura dos 24 coeficientes de calibração e compensação em hardware. |
+| **UART TX**                      | Transmissão assíncrona  | Oversampling 16x, precisão temporal aprimorada.                      |
+| **HDMI Renderer / TMDS Encoder** | Geração de vídeo 720p   | Codificação 8b/10b e double-buffering entre domínios de clock.       |
+| **PLL (EHXPLLL)**                | Geração de clocks       | Produz 74.25 MHz (pixel) e 371.25 MHz (serial).                      |
 
 ---
 
-## Fluxo de Ferramentas (Toolchain)
+## 🧩 Ferramentas Utilizadas
 
-[cite_start]Este projeto foi desenvolvido utilizando o fluxo de ferramentas *open-source* para FPGAs da Lattice[cite: 35, 51]. Para sintetizar e gerar o *bitstream*:
+| Tipo          | Ferramenta             | Descrição                                     |
+| ------------- | ---------------------- | --------------------------------------------- |
+| Síntese       | **Yosys**              | Geração de netlist a partir do SystemVerilog. |
+| Place & Route | **NextPNR**            | Mapeamento para o dispositivo Lattice ECP5.   |
+| Bitstream     | **Project Trellis**    | Geração final do arquivo `.bit` para a FPGA.  |
+| Simulação     | **GTKWave / iverilog** | Testbench e depuração dos módulos FSM.        |
 
-1.  [cite_start]**Síntese:** `Yosys` [cite: 51, 133]
-2.  [cite_start]**Place and Route:** `Nextpnr` [cite: 51, 133]
-3.  [cite_start]**Geração do Bitstream:** `Project Trellis` [cite: 51]
+---
 
-[cite_start]O arquivo de restrições de pinos (`.lpf`) é baseado no *pinout* da comunidade para a placa Colorlight i9[cite: 69, 96].
+## 💡 Adaptações e Versão Final (Protótipo Demonstrado)
 
-## Autores do Projeto
+Durante os testes práticos, foi identificada a dificuldade de emular corretamente o **dreno aberto (open-drain)** do I²C no ECP5.
+Assim, a versão final do hardware apresentado utilizou:
 
-* [cite_start]Agnes de Oliveira Freire [cite: 2]
-* [cite_start]Antonio Sergio Castro de Carvalho Jr [cite: 2]
-* [cite_start]Matheus Santos Vieira [cite: 3]
-* [cite_start]Valmir Linhares de Sousa de Mesquita [cite: 3]
+* **Protocolo SPI** (em vez de I²C);
+* **Sensor BMP280** (substituindo o ADXL345);
+* **Lógica de compensação** implementada em hardware para cálculo de pressão e temperatura em tempo real.
 
-## Agradecimentos
+---
 
-[cite_start]Este trabalho foi realizado com o apoio do programa **EmbarcaTech TIC 37 (Softex)** e do **Instituto Federal do Maranhão (IFMA)**[cite: 105].
+## 🧪 Resultados
+
+* Comunicação SPI validada com o sensor BMP280.
+* Geração estável de vídeo HDMI a **720p@60Hz** com codificação TMDS funcional.
+* Clock de serialização atingindo **742.5 Mbps** sem transceptores SERDES dedicados.
+* Comunicação UART TX funcional via oversampling 16x.
+* Sincronização entre domínios de clock (CDC) com **double-buffering**.
+
+---
+
+## 📁 Estrutura do Repositório
+
+```
+ECP5_HDMI_USART_SPI_I2C_Embarcatech/
+├── src/                  # Códigos-fonte em SystemVerilog
+│   ├── i2c_master.sv
+│   ├── spi_master.sv
+│   ├── uart_tx.sv
+│   ├── renderer_720p.sv
+│   ├── tmds_encoder.sv
+│   ├── pll_config.sv
+│   └── top.sv
+├── constraints/          # Arquivos .lpf (mapeamento de pinos)
+├── sim/                  # Testbenches e scripts de simulação
+├── build/                # Scripts para síntese e bitstream
+└── README.md
+```
+
+---
+
+## 🧰 Requisitos de Hardware
+
+* FPGA: **Colorlight i9 (Lattice ECP5 LFE5U-45F-6BG381C)**
+* Sensor: **ADXL345** (I²C) ou **BMP280** (SPI)
+* Saída de vídeo: **HDMI (720p@60Hz)**
+* Interface serial: **UART (115200 bps)**
+
+---
+
+## 🚀 Como Rodar o Projeto
+
+1. **Clone o repositório:**
+
+   ```bash
+   git clone https://github.com/heavymsv/ECP5_HDMI_USART_SPI_I2C_Embarcatech.git
+   cd ECP5_HDMI_USART_SPI_I2C_Embarcatech
+   ```
+
+2. **Sintetize o projeto:**
+
+   ```bash
+   yosys -p "synth_ecp5 -top top -json top.json" src/*.sv
+   ```
+
+3. **Execute o Place & Route:**
+
+   ```bash
+   nextpnr-ecp5 --json top.json --lpf constraints/colorlight_i9.lpf --textcfg top.config --85k
+   ```
+
+4. **Gere o bitstream:**
+
+   ```bash
+   ecppack top.config top.bit
+   ```
+
+5. **Carregue na FPGA:**
+
+   ```bash
+   openFPGALoader -b colorlight-i9 top.bit
+   ```
+
+---
+
+## 📊 Futuras Extensões
+
+* Implementação do **Receptor UART (RX)** para comunicação bidirecional.
+* Renderização de texto via **Character ROM em BRAM**.
+* Suporte a resoluções superiores (1080p) com pipelining otimizado.
+
+---
+
+## 👥 Autores
+
+* **Agnes de Oliveira Freire**
+* **Antonio Sergio Castro de Carvalho Jr**
+* **Matheus Santos Vieira**
+* **Valmir Linhares de Sousa de Mesquita**
+
+Residência Tecnológica **EmbarcaTech TIC 37 – IFMA**
+
+---
+
+## 📜 Licença
+
+Este projeto é distribuído sob a licença **MIT**.
+Consulte o arquivo `LICENSE` para mais detalhes.
+
+---
+
+## 📚 Referências Principais
+
+* [Analog Devices – ADXL345 Datasheet](https://www.analog.com/en/products/adxl345.html)
+* [Project F – FPGA Graphics](https://github.com/projf/projf-explore/tree/main/graphics/fpga-graphics)
+* [Project F – ECP5 FPGA Clock Generation](https://projectf.io/posts/ecp5-fpga-clock/)
+* [Colorlight i9 Tools – GitHub](https://github.com/kittennbfive/Colorlight-i9-tools)
+* [Yosys Open Source Synthesis Suite](https://github.com/YosysHQ/yosys)
+* [NextPNR – Open Source Place & Route](https://github.com/YosysHQ/nextpnr)
+
+---
+
+> 🧩 *“Compreender o domínio de clock, as primitivas de hardware e o controle de protocolos seriais é essencial para o sucesso em projetos FPGA.”*
